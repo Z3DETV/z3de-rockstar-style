@@ -7,6 +7,10 @@ function normalizeUsername(input: string) {
   return input.trim();
 }
 
+function isValidUsername(u: string) {
+  return u.length >= 3 && u.length <= 20 && /^[A-Za-z0-9_]+$/.test(u);
+}
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
@@ -29,11 +33,12 @@ export default function AuthPage() {
     setMsg(null);
 
     const u = normalizeUsername(username);
+
     if (!u) {
       setMsg("Choisis un pseudo.");
       return;
     }
-    if (u.length < 3 || u.length > 20 || !/^[A-Za-z0-9_]+$/.test(u)) {
+    if (!isValidUsername(u)) {
       setMsg("Pseudo invalide. 3–20 caractères, lettres/chiffres/_ uniquement.");
       return;
     }
@@ -41,18 +46,20 @@ export default function AuthPage() {
     setBusy(true);
 
     try {
-      // IMPORTANT : pendant la confirmation email, l'utilisateur n'a pas encore de session.
-      // Donc on stocke le pseudo localement, et on le posera lors du callback.
+      // Backup local (utile si jamais metadata ne passe pas dans un contexte bizarre)
       localStorage.setItem("pending_username", u);
 
-      const origin = window.location.origin;
+      const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
 
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // Après clic sur le mail, Supabase renverra ici
           emailRedirectTo: `${origin}/auth/callback`,
+          data: {
+            // ✅ le pseudo voyage avec la confirmation email
+            pending_username: u,
+          },
         },
       });
 
@@ -98,7 +105,10 @@ export default function AuthPage() {
             <h1 className="text-xl font-semibold">
               {mode === "register" ? "Créer un compte" : "Se connecter"}
             </h1>
-            <a href="/" className="mt-2 inline-block text-sm text-white/70 hover:text-white">
+            <a
+              href="/"
+              className="mt-2 inline-block text-sm text-white/70 hover:text-white"
+            >
               ← Retour à l’accueil
             </a>
           </div>
@@ -111,7 +121,10 @@ export default function AuthPage() {
           </button>
         </div>
 
-        <form className="mt-6 space-y-3" onSubmit={mode === "register" ? onRegister : onLogin}>
+        <form
+          className="mt-6 space-y-3"
+          onSubmit={mode === "register" ? onRegister : onLogin}
+        >
           <input
             className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 outline-none"
             placeholder="Email"
