@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 function normalizeUsername(input: string) {
@@ -12,12 +13,20 @@ function isValidUsername(u: string) {
 }
 
 export default function AuthPage() {
+  const searchParams = useSearchParams();
+
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // ✅ Ouvre automatiquement login/register selon l'URL : /auth?mode=login
+  useEffect(() => {
+    const m = searchParams.get("mode");
+    if (m === "login" || m === "register") setMode(m);
+  }, [searchParams]);
 
   const usernameHint = useMemo(() => {
     const u = normalizeUsername(username);
@@ -88,7 +97,6 @@ export default function AuthPage() {
       });
       if (error) throw error;
 
-      // Après login, on revient sur l'accueil
       window.location.href = "/";
     } catch (err: any) {
       setMsg(err?.message ?? "Erreur inconnue");
@@ -115,7 +123,10 @@ export default function AuthPage() {
 
           <button
             className="text-sm text-white/70 hover:text-white"
-            onClick={() => setMode(mode === "register" ? "login" : "register")}
+            onClick={() => {
+              setMsg(null);
+              setMode(mode === "register" ? "login" : "register");
+            }}
           >
             {mode === "register" ? "J’ai déjà un compte" : "Créer un compte"}
           </button>
