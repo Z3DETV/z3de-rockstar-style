@@ -27,42 +27,40 @@ export default function AuthPage() {
   async function onRegister(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
-    setBusy(true);
 
     const u = normalizeUsername(username);
+    if (!u) {
+      setMsg("Choisis un pseudo.");
+      return;
+    }
+    if (u.length < 3 || u.length > 20 || !/^[A-Za-z0-9_]+$/.test(u)) {
+      setMsg("Pseudo invalide. 3–20 caractères, lettres/chiffres/_ uniquement.");
+      return;
+    }
+
+    setBusy(true);
 
     try {
-      // 1) Sign up
-      const { data, error } = await supabase.auth.signUp({
+      // IMPORTANT : pendant la confirmation email, l'utilisateur n'a pas encore de session.
+      // Donc on stocke le pseudo localement, et on le posera lors du callback.
+      localStorage.setItem("pending_username", u);
+
+      const origin = window.location.origin;
+
+      const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          // Après clic sur le mail, Supabase renverra ici
+          emailRedirectTo: `${origin}/auth/callback`,
+        },
       });
+
       if (error) throw error;
 
-      const userId = data.user?.id;
-      if (!userId) {
-        setMsg("Inscription OK. Vérifie ton email si demandé par Supabase.");
-        return;
-      }
-
-      // 2) Set username in profiles (unique constraint enforced in DB)
-      const { error: upErr } = await supabase
-        .from("profiles")
-        .update({ username: u })
-        .eq("id", userId);
-
-      if (upErr) {
-        // If username is taken (unique violation), show a friendly message
-        const raw = String(upErr.message || upErr);
-        if (raw.includes("duplicate key") || raw.includes("unique")) {
-          setMsg("Ce pseudo est déjà pris. Essaie-en un autre.");
-        } else {
-          setMsg("Compte créé, mais pseudo refusé: " + raw);
-        }
-        return;
-      }
-
-      setMsg("✅ Compte créé ! Tu peux te connecter.");
+      setMsg(
+        "✅ Compte créé ! Va confirmer ton email. Après validation, tu seras renvoyé automatiquement sur le site."
+      );
       setMode("login");
     } catch (err: any) {
       setMsg(err?.message ?? "Erreur inconnue");
@@ -75,6 +73,7 @@ export default function AuthPage() {
     e.preventDefault();
     setMsg(null);
     setBusy(true);
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -82,8 +81,8 @@ export default function AuthPage() {
       });
       if (error) throw error;
 
-      // Redirect simple
-      window.location.href = "/account";
+      // Après login, on revient sur l'accueil
+      window.location.href = "/";
     } catch (err: any) {
       setMsg(err?.message ?? "Erreur inconnue");
     } finally {
@@ -94,10 +93,16 @@ export default function AuthPage() {
   return (
     <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">
-            {mode === "register" ? "Créer un compte" : "Se connecter"}
-          </h1>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold">
+              {mode === "register" ? "Créer un compte" : "Se connecter"}
+            </h1>
+            <a href="/" className="mt-2 inline-block text-sm text-white/70 hover:text-white">
+              ← Retour à l’accueil
+            </a>
+          </div>
+
           <button
             className="text-sm text-white/70 hover:text-white"
             onClick={() => setMode(mode === "register" ? "login" : "register")}
@@ -133,7 +138,8 @@ export default function AuthPage() {
                 onChange={(e) => setUsername(e.target.value)}
               />
               <p className="text-xs text-white/60">
-                Règles : 3–20 caractères, lettres/chiffres/_ uniquement. {usernameHint && `(${usernameHint})`}
+                Règles : 3–20 caractères, lettres/chiffres/_ uniquement.{" "}
+                {usernameHint && `(${usernameHint})`}
               </p>
             </>
           )}
