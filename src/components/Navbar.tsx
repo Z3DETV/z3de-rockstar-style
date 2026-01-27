@@ -1,45 +1,103 @@
 "use client";
+
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+type Profile = {
+  username: string | null;
+};
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+
+      if (data.user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", data.user.id)
+          .single();
+
+        setProfile(profileData);
+      }
+
+      setLoading(false);
+    };
+
+    getUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      getUser();
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  const logout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
   return (
-    <header
-      className={[
-        "fixed inset-x-0 top-0 z-50 transition-all",
-        scrolled
-          ? "backdrop-blur-md bg-black/35 border-b border-white/10"
-          : "bg-transparent",
-      ].join(" ")}
-    >
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="h-16 flex items-center justify-between gap-3">
-          <a href="#top" className="tracking-[.22em] font-semibold text-sm md:text-base select-none">
-            Z3DE<span className="opacity-60">.GG</span>
-          </a>
+    <header className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/60 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
 
-          <nav className="hidden md:flex items-center gap-8 text-sm text-white/80">
-            <a className="hover:text-white transition" href="#showcase">SHOWCASE</a>
-            <a className="hover:text-white transition" href="#live">LIVE</a>
-            <a className="hover:text-white transition" href="#community">COMMUNITY</a>
-          </nav>
+        {/* Logo */}
+        <Link href="/" className="font-semibold tracking-wider">
+          Z3DE.GG
+        </Link>
 
-          <div className="flex items-center gap-2">
-            <a className="px-3 py-2 rounded-full text-xs md:text-sm border border-white/15 hover:border-white/30 hover:bg-white/5 transition" href="#">
-              Login
-            </a>
-            <a className="px-3 py-2 rounded-full text-xs md:text-sm bg-white text-black hover:bg-white/90 transition" href="#">
-              Register
-            </a>
-          </div>
+        {/* Right */}
+        <div className="flex items-center gap-4 text-sm">
+
+          {loading ? null : user ? (
+            <>
+              <Link
+                href="/account"
+                className="text-white/80 hover:text-white"
+              >
+                @{profile?.username ?? "player"}
+              </Link>
+
+              <button
+                onClick={logout}
+                className="rounded border border-white/20 px-3 py-1 hover:bg-white/10"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/auth"
+                className="hover:text-white/90"
+              >
+                Login
+              </Link>
+
+              <Link
+                href="/auth"
+                className="rounded bg-white px-3 py-1 text-black hover:bg-white/90"
+              >
+                Register
+              </Link>
+            </>
+          )}
+
         </div>
       </div>
     </header>
