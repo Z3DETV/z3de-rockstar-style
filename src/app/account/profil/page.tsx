@@ -41,11 +41,8 @@ export default function ProfileSettingsPage() {
 
       if (!mounted) return;
 
-      if (error) {
-        setProfile(null);
-      } else {
-        setProfile(data as Profile);
-      }
+      if (error) setProfile(null);
+      else setProfile(data as Profile);
 
       setLoading(false);
     }
@@ -59,6 +56,23 @@ export default function ProfileSettingsPage() {
   return (
     <main className="min-h-screen px-6 py-10">
       <div className="mx-auto max-w-3xl">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push("/");
+            }}
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+          >
+            ← Retour
+          </button>
+
+          <a href="/" className="text-sm text-white/60 hover:text-white/80">
+            Accueil
+          </a>
+        </div>
+
         <h1 className="text-2xl font-semibold">Mon profil</h1>
         <p className="mt-1 text-white/60">Modifie ton pseudo, ta bio et ton avatar.</p>
 
