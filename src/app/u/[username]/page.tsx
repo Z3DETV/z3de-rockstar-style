@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 import ProfileCard from "../../../components/ProfileCard";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -34,11 +34,8 @@ export default function PublicProfilePage() {
 
       if (!mounted) return;
 
-      if (error || !data) {
-        setProfile(null);
-      } else {
-        setProfile(data as Profile);
-      }
+      if (error || !data) setProfile(null);
+      else setProfile(data as Profile);
 
       setLoading(false);
     }
@@ -49,8 +46,6 @@ export default function PublicProfilePage() {
     };
   }, [username]);
 
-  if (!loading && !profile) return notFound();
-
   return (
     <main className="min-h-screen px-6 py-10">
       <div className="mx-auto max-w-3xl">
@@ -58,8 +53,12 @@ export default function PublicProfilePage() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
             Chargement...
           </div>
+        ) : profile ? (
+          <ProfileCard profile={profile} />
         ) : (
-          <ProfileCard profile={profile!} />
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
+            Profil introuvable.
+          </div>
         )}
       </div>
     </main>
