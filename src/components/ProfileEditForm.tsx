@@ -98,41 +98,73 @@ export default function ProfileEditForm({
     setMsg(null);
     setUploading(true);
 
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowed.includes(file.type)) {
+      setUploading(false);
+      setMsg("Format interdit. Utilise JPG, PNG ou WEBP.");
+      return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
       setUploading(false);
-      setMsg("Erreur : max 2MB.");
+      setMsg("Image trop lourde (max 2MB).");
       return;
     }
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-    const path = `${profile.id}/avatar.${ext}`;
+    // Vérifie que c'est une vraie image décodable (bloque fichiers corrompus/masqués)
+    const objectUrl = URL.createObjectURL(file);
+    const ok = await new Promise<boolean>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = objectUrl;
+    });
+    URL.revokeObjectURL(objectUrl);
 
-    const { error: upErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true, contentType: file.type });
-
-    if (upErr) {
+    if (!ok) {
       setUploading(false);
-      setMsg(`Erreur upload : ${upErr.message}`);
+      setMsg("Fichier invalide (image illisible).");
       return;
     }
 
-    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    // ✅ récupère le token (obligatoire pour que l'API sache qui est l'user)
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
 
-    const { error: dbErr } = await supabase
-      .from("profiles")
-      .update({ avatar_url: data.publicUrl })
-      .eq("id", profile.id);
-
-    setUploading(false);
-
-    if (dbErr) {
-      setMsg(`Erreur : ${dbErr.message}`);
+    if (!token) {
+      setUploading(false);
+      setMsg("Tu dois être connecté.");
       return;
     }
 
-    setMsg("Avatar mis à jour ✅");
-    onUpdated?.();
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch("/api/avatar", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setUploading(false);
+        setMsg(data?.error ?? "Erreur : upload refusé.");
+        return;
+      }
+
+      setUploading(false);
+      setMsg("Avatar mis à jour ✅");
+      onUpdated?.();
+    } catch (e: any) {
+      setUploading(false);
+      setMsg(e?.message ?? "Erreur inconnue");
+    }
   }
 
   return (
@@ -145,19 +177,25 @@ export default function ProfileEditForm({
           ) : null}
         </div>
 
-        <label className="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm hover:bg-white/10">
-          {uploading ? "Upload..." : "Changer l’avatar"}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) uploadAvatar(f);
-            }}
-            disabled={uploading}
-          />
-        </label>
+        <div>
+          <label className="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 inline-block">
+            {uploading ? "Upload..." : "Changer l’avatar"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAvatar(f);
+              }}
+              disabled={uploading}
+            />
+          </label>
+
+          <p className="mt-2 text-xs text-white/50">
+            Contenu offensant / nudité / haine = refus automatique + sanctions.
+          </p>
+        </div>
       </div>
 
       <div className="mt-6 space-y-4">
