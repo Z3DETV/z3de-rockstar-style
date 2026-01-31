@@ -31,6 +31,8 @@ export default function Navbar() {
           .single();
 
         setProfile(profileData);
+      } else {
+        setProfile(null);
       }
 
       setLoading(false);
@@ -52,10 +54,11 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
+  const username = profile?.username ?? null;
+
   return (
     <header className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/60 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
-
         {/* Logo */}
         <Link href="/" className="font-semibold tracking-wider">
           Z3DE.GG
@@ -63,14 +66,22 @@ export default function Navbar() {
 
         {/* Right */}
         <div className="flex items-center gap-4 text-sm">
-
           {loading ? null : user ? (
             <>
-              <Link
-                href="/account"
-                className="text-white/80 hover:text-white"
-              >
-                @{profile?.username ?? "player"}
+              {/* Mon profil public */}
+              {username ? (
+                <Link href={`/u/${username}`} className="text-white/80 hover:text-white">
+                  @{username}
+                </Link>
+              ) : (
+                <Link href="/account/profil" className="text-white/80 hover:text-white">
+                  @player
+                </Link>
+              )}
+
+              {/* Paramètres profil */}
+              <Link href="/account/profil" className="text-white/70 hover:text-white">
+                Paramètres
               </Link>
 
               <button
@@ -82,22 +93,18 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link
-                href="/auth"
-                className="hover:text-white/90"
-              >
+              <Link href="/auth?mode=login" className="hover:text-white/90">
                 Login
               </Link>
 
               <Link
-                href="/auth"
+                href="/auth?mode=register"
                 className="rounded bg-white px-3 py-1 text-black hover:bg-white/90"
               >
                 Register
               </Link>
             </>
           )}
-
         </div>
       </div>
     </header>
