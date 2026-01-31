@@ -81,7 +81,10 @@ export default function ProfileEditForm({
       payload.last_username_change_at = new Date().toISOString();
     }
 
-    const { error } = await supabase.from("profiles").update(payload).eq("id", profile.id);
+    const { error } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", profile.id);
 
     setSaving(false);
 
@@ -102,7 +105,7 @@ export default function ProfileEditForm({
 
     if (!allowed.includes(file.type)) {
       setUploading(false);
-      setMsg("Format interdit. Utilise JPG, PNG ou WEBP.");
+      setMsg("Format interdit (JPG / PNG / WEBP uniquement).");
       return;
     }
 
@@ -112,58 +115,40 @@ export default function ProfileEditForm({
       return;
     }
 
-    // Vérifie que c'est une vraie image décodable (bloque fichiers corrompus/masqués)
-    const objectUrl = URL.createObjectURL(file);
-    const ok = await new Promise<boolean>((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(true);
-      img.onerror = () => resolve(false);
-      img.src = objectUrl;
-    });
-    URL.revokeObjectURL(objectUrl);
-
-    if (!ok) {
-      setUploading(false);
-      setMsg("Fichier invalide (image illisible).");
-      return;
-    }
-
-    // ✅ récupère le token (obligatoire pour que l'API sache qui est l'user)
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-
-    if (!token) {
-      setUploading(false);
-      setMsg("Tu dois être connecté.");
-      return;
-    }
-
     try {
-      const fd = new FormData();
-      fd.append("file", file);
+      const ext =
+        file.type === "image/png"
+          ? "png"
+          : file.type === "image/webp"
+          ? "webp"
+          : "jpg";
 
-      const res = await fetch("/api/avatar", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: fd,
-      });
+      const path = `${profile.id}/avatar.${ext}`;
 
-      const data = await res.json().catch(() => null);
+      // Upload Supabase Storage
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
 
-      if (!res.ok) {
-        setUploading(false);
-        setMsg(data?.error ?? "Erreur : upload refusé.");
-        return;
-      }
+      if (upErr) throw upErr;
 
-      setUploading(false);
+      // URL publique
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+
+      // Update DB
+      const { error: dbErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: data.publicUrl })
+        .eq("id", profile.id);
+
+      if (dbErr) throw dbErr;
+
       setMsg("Avatar mis à jour ✅");
       onUpdated?.();
     } catch (e: any) {
+      setMsg(e?.message ?? "Erreur upload.");
+    } finally {
       setUploading(false);
-      setMsg(e?.message ?? "Erreur inconnue");
     }
   }
 
@@ -173,7 +158,11 @@ export default function ProfileEditForm({
         <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white/10">
           {profile.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.avatar_url} alt="avatar" className="h-full w-full object-cover" />
+            <img
+              src={profile.avatar_url}
+              alt="avatar"
+              className="h-full w-full object-cover"
+            />
           ) : null}
         </div>
 
@@ -193,7 +182,7 @@ export default function ProfileEditForm({
           </label>
 
           <p className="mt-2 text-xs text-white/50">
-            Contenu offensant / nudité / haine = refus automatique + sanctions.
+            (MVP) Pas de modération auto pour l’instant.
           </p>
         </div>
       </div>
