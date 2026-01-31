@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -12,7 +12,7 @@ function isValidUsername(u: string) {
   return u.length >= 3 && u.length <= 20 && /^[A-Za-z0-9_]+$/.test(u);
 }
 
-export default function AuthPage() {
+function AuthInner() {
   const searchParams = useSearchParams();
 
   const [mode, setMode] = useState<"login" | "register">("register");
@@ -179,5 +179,21 @@ export default function AuthPage() {
         {msg && <p className="mt-4 text-sm text-white/80">{msg}</p>}
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
+            Chargement...
+          </div>
+        </main>
+      }
+    >
+      <AuthInner />
+    </Suspense>
   );
 }
