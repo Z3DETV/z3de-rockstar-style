@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type Profile = {
@@ -16,6 +16,11 @@ function isValidUsername(u: string) {
   return /^[a-zA-Z0-9_]{3,20}$/.test(u);
 }
 
+function withCacheBuster(url: string) {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}v=${Date.now()}`;
+}
+
 export default function ProfileEditForm({
   profile,
   onUpdated,
@@ -29,6 +34,22 @@ export default function ProfileEditForm({
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Pour pouvoir re-sélectionner le même fichier (sinon onChange ne re-fire pas)
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Affichage avatar avec anti-cache (sinon tu vois l’ancien)
+  const avatarSrc = useMemo(() => {
+    if (!profile.avatar_url) return null;
+    return withCacheBuster(profile.avatar_url);
+  }, [profile.avatar_url]);
+
+  useEffect(() => {
+    // Si le parent te renvoie un profile mis à jour, on resync l’état local
+    setUsername(profile.username);
+    setDisplayName(profile.display_name ?? "");
+    setBio(profile.bio ?? "");
+  }, [profile.id, profile.username, profile.display_name, profile.bio]);
 
   async function save() {
     setMsg(null);
@@ -58,11 +79,17 @@ export default function ProfileEditForm({
       }
 
       // check unicité (case-insensitive)
-      const { data: exists } = await supabase
+      const { data: exists, error: existsErr } = await supabase
         .from("profiles")
         .select("id")
         .ilike("username", nextUsername)
         .maybeSingle();
+
+      if (existsErr) {
+        setSaving(false);
+        setMsg(`Erreur : ${existsErr.message}`);
+        return;
+      }
 
       if (exists && exists.id !== profile.id) {
         setSaving(false);
@@ -81,10 +108,7 @@ export default function ProfileEditForm({
       payload.last_username_change_at = new Date().toISOString();
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .update(payload)
-      .eq("id", profile.id);
+    const { error } = await supabase.from("profiles").update(payload).eq("id", profile.id);
 
     setSaving(false);
 
@@ -103,25 +127,18 @@ export default function ProfileEditForm({
 
     const allowed = ["image/jpeg", "image/png", "image/webp"];
 
-    if (!allowed.includes(file.type)) {
-      setUploading(false);
-      setMsg("Format interdit (JPG / PNG / WEBP uniquement).");
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      setUploading(false);
-      setMsg("Image trop lourde (max 2MB).");
-      return;
-    }
-
     try {
+      if (!allowed.includes(file.type)) {
+        throw new Error("Format interdit (JPG / PNG / WEBP uniquement).");
+      }
+
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error("Image trop lourde (max 2MB).");
+      }
+
+      // Ext safe
       const ext =
-        file.type === "image/png"
-          ? "png"
-          : file.type === "image/webp"
-          ? "webp"
-          : "jpg";
+        file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
 
       const path = `${profile.id}/avatar.${ext}`;
 
@@ -130,20 +147,34 @@ export default function ProfileEditForm({
         .from("avatars")
         .upload(path, file, { upsert: true, contentType: file.type });
 
-      if (upErr) throw upErr;
+      if (upErr) {
+        // Message clair si bucket pas créé / pas public / etc.
+        if (upErr.message?.toLowerCase().includes("bucket")) {
+          throw new Error(
+            "Bucket 'avatars' introuvable. Va sur Supabase > Storage et crée un bucket nommé exactement 'avatars'."
+          );
+        }
+        throw upErr;
+      }
 
       // URL publique
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = pub.publicUrl;
 
       // Update DB
       const { error: dbErr } = await supabase
         .from("profiles")
-        .update({ avatar_url: data.publicUrl })
+        .update({ avatar_url: publicUrl })
         .eq("id", profile.id);
 
       if (dbErr) throw dbErr;
 
+      // Reset input pour pouvoir re-uploader le même fichier
+      if (fileInputRef.current) fileInputRef.current.value = "";
+
       setMsg("Avatar mis à jour ✅");
+
+      // Demande au parent de recharger le profil (important pour voir l’avatar direct)
       onUpdated?.();
     } catch (e: any) {
       setMsg(e?.message ?? "Erreur upload.");
@@ -156,13 +187,9 @@ export default function ProfileEditForm({
     <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
       <div className="flex items-center gap-4">
         <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white/10">
-          {profile.avatar_url ? (
+          {avatarSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={profile.avatar_url}
-              alt="avatar"
-              className="h-full w-full object-cover"
-            />
+            <img src={avatarSrc} alt="avatar" className="h-full w-full object-cover" />
           ) : null}
         </div>
 
@@ -170,8 +197,9 @@ export default function ProfileEditForm({
           <label className="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 inline-block">
             {uploading ? "Upload..." : "Changer l’avatar"}
             <input
+              ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -181,9 +209,7 @@ export default function ProfileEditForm({
             />
           </label>
 
-          <p className="mt-2 text-xs text-white/50">
-            (MVP) Pas de modération auto pour l’instant.
-          </p>
+          <p className="mt-2 text-xs text-white/50">(MVP) Pas de modération auto pour l’instant.</p>
         </div>
       </div>
 
