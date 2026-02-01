@@ -2,6 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
+  // ✅ 1) Force domaine canonique : www.z3de.net -> z3de.net
+  const host = request.headers.get("host") || "";
+  if (host.startsWith("www.")) {
+    const url = request.nextUrl.clone();
+    url.hostname = host.replace(/^www\./, "");
+    return NextResponse.redirect(url, 308);
+  }
+
+  // ✅ 2) Supabase SSR session refresh (ton code)
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
