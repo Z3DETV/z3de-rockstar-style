@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProfileEditForm from "../../../components/ProfileEditForm";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@/lib/supabase/client";
 
 type Profile = {
   id: string;
@@ -16,6 +16,8 @@ type Profile = {
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,11 +27,11 @@ export default function ProfileSettingsPage() {
     async function load() {
       setLoading(true);
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const user = userData?.user;
 
-      if (!user) {
-        router.push("/auth");
+      if (!user || userError) {
+        router.replace("/auth?mode=login&next=/account/profil");
         return;
       }
 
@@ -51,6 +53,7 @@ export default function ProfileSettingsPage() {
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   return (
