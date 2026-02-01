@@ -17,12 +17,12 @@ type UserItem = {
   item: Item;
 };
 
+type Slot = "wall" | "floor" | "furniture_1" | "decor_1" | "decor_2" | "effect_1";
+
 type Equipped = {
   slot: Slot;
   item: Item;
 };
-
-type Slot = "wall" | "floor" | "furniture_1" | "decor_1" | "decor_2" | "effect_1";
 
 const SLOTS: Slot[] = ["wall", "floor", "furniture_1", "decor_1", "decor_2", "effect_1"];
 
@@ -176,6 +176,16 @@ export default function HomeEditor({ userId }: { userId: string }) {
 
   return (
     <div className="p-6 space-y-8">
+      {/* ✅ Back button */}
+      <div>
+        <a
+          href="/account/profil"
+          className="inline-block rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+        >
+          ← Retour au profil
+        </a>
+      </div>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">🏠 Ma Maison</h1>
