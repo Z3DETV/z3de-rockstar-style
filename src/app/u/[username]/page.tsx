@@ -23,28 +23,19 @@ function PageShell({ children }: { children: React.ReactNode }) {
           >
             ← Accueil
           </a>
-
           <span className="text-sm text-white/60">Profil public</span>
         </div>
-
         {children}
       </div>
     </main>
   );
 }
 
-/**
- * Nettoyage MAXIMAL du username
- */
 function normalizeUsername(raw: string) {
-  if (!raw) return "";
-
-  return decodeURIComponent(raw)
-    .replace(/\?.*$/, "") // enlève tout après ?
-    .replace(/#.*/, "")   // enlève tout après #
+  return decodeURIComponent(raw ?? "")
+    .split("?")[0] // enlève les params
     .trim()
-    .replaceAll("/", "")
-    .toLowerCase();       // on force en lowercase
+    .replaceAll("/", "");
 }
 
 export default async function PublicProfilePage({
@@ -52,25 +43,36 @@ export default async function PublicProfilePage({
 }: {
   params: { username: string };
 }) {
-  const raw = params.username;
+  // ✅ ICI le point clé : raw vient bien de params.username
+  const raw = params?.username ?? "";
   const username = normalizeUsername(raw);
 
+  console.log("[PROFILE] PARAMS =", params);
   console.log("[PROFILE] RAW =", raw);
   console.log("[PROFILE] CLEAN =", username);
+
+  if (!username) {
+    return (
+      <PageShell>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
+          Username manquant dans l’URL.
+        </div>
+      </PageShell>
+    );
+  }
 
   const { data, error } = await publicSupabase
     .from("profiles_public")
     .select("username, display_name, bio, avatar_url, updated_at")
-    .eq("username_lc", username)
+    .eq("username_lc", username.toLowerCase())
     .maybeSingle();
 
   if (error) {
-    console.error("[public-profile] error:", error);
-
+    console.error("[public-profile] fetch error:", error);
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-          Une erreur est survenue.
+          Une erreur est survenue lors du chargement du profil.
         </div>
       </PageShell>
     );
@@ -78,7 +80,6 @@ export default async function PublicProfilePage({
 
   if (!data) {
     console.warn("[public-profile] NOT FOUND:", username);
-
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
