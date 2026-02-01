@@ -44,6 +44,7 @@ export default async function PublicProfilePage({
 }) {
   // ✅ IMPORTANT: publicSupabase est un client, pas une fonction
   const supabase = publicSupabase;
+console.log("SUPABASE_URL =", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   const username = normalizeUsername(params.username);
 
