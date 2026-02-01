@@ -42,31 +42,37 @@ export default async function PublicProfilePage({
 }: {
   params: { username: string };
 }) {
-  // ✅ IMPORTANT: publicSupabase est un client, pas une fonction
   const supabase = publicSupabase;
-console.log("SUPABASE_URL =", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   const username = normalizeUsername(params.username);
+  const usernameLc = username.toLowerCase();
 
-  // 1) Recherche insensible à la casse
-  let { data, error } = await supabase
-    .from("profiles")
-    .select("username, display_name, bio, avatar_url, updated_at")
-    .ilike("username", username)
-    .limit(1)
-    .maybeSingle();
+  let data: Profile | null = null;
+  let error: any = null;
 
-  // 2) Fallback
-  if (!error && !data && username.toLowerCase() !== username) {
-    const secondTry = await supabase
+  // 1) ✅ Requête principale via la vue (case-insensitive garanti)
+  {
+    const res = await supabase
+      .from("profiles_public")
+      .select("username, display_name, bio, avatar_url, updated_at")
+      .eq("username_lc", usernameLc)
+      .maybeSingle();
+
+    data = (res.data as Profile | null) ?? null;
+    error = res.error ?? null;
+  }
+
+  // 2) ✅ Fallback si la vue n'existe pas OU si ça ne remonte rien
+  if (!error && !data) {
+    const res = await supabase
       .from("profiles")
       .select("username, display_name, bio, avatar_url, updated_at")
-      .ilike("username", username.toLowerCase())
+      .ilike("username", username)
       .limit(1)
       .maybeSingle();
 
-    data = secondTry.data;
-    error = secondTry.error;
+    data = (res.data as Profile | null) ?? null;
+    error = res.error ?? null;
   }
 
   if (error) {
@@ -99,7 +105,7 @@ console.log("SUPABASE_URL =", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   return (
     <PageShell>
-      <ProfileCard profile={data as Profile} />
+      <ProfileCard profile={data} />
     </PageShell>
   );
 }
