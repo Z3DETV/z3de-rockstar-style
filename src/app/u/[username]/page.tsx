@@ -25,6 +25,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
           </a>
           <span className="text-sm text-white/60">Profil public</span>
         </div>
+
         {children}
       </div>
     </main>
@@ -32,8 +33,10 @@ function PageShell({ children }: { children: React.ReactNode }) {
 }
 
 function normalizeUsername(raw: string) {
-  return decodeURIComponent(raw ?? "")
-    .split("?")[0] // enlève les params
+  if (!raw) return "";
+
+  return decodeURIComponent(raw)
+    .split("?")[0]
     .trim()
     .replaceAll("/", "");
 }
@@ -41,13 +44,13 @@ function normalizeUsername(raw: string) {
 export default async function PublicProfilePage({
   params,
 }: {
-  params: { username: string };
+  params: Promise<{ username: string }>;
 }) {
-  // ✅ ICI le point clé : raw vient bien de params.username
-  const raw = params?.username ?? "";
+  // ✅ IMPORTANT : await params
+  const { username: raw } = await params;
+
   const username = normalizeUsername(raw);
 
-  console.log("[PROFILE] PARAMS =", params);
   console.log("[PROFILE] RAW =", raw);
   console.log("[PROFILE] CLEAN =", username);
 
@@ -68,11 +71,12 @@ export default async function PublicProfilePage({
     .maybeSingle();
 
   if (error) {
-    console.error("[public-profile] fetch error:", error);
+    console.error("[public-profile] error:", error);
+
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-          Une erreur est survenue lors du chargement du profil.
+          Une erreur est survenue.
         </div>
       </PageShell>
     );
@@ -80,6 +84,7 @@ export default async function PublicProfilePage({
 
   if (!data) {
     console.warn("[public-profile] NOT FOUND:", username);
+
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
