@@ -1,5 +1,6 @@
 import ProfileCard from "@/components/ProfileCard";
-import { publicSupabase } from "@/lib/supabase/public";
+import { supabase } from "@/lib/supabase/public";
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -64,7 +65,7 @@ export default async function PublicProfilePage({
     );
   }
 
-  const { data, error } = await publicSupabase
+  const { data, error } = await supabase
     .from("profiles_public")
     .select("username, display_name, bio, avatar_url, updated_at")
     .eq("username_lc", username.toLowerCase())
