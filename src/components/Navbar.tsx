@@ -106,9 +106,7 @@ export default function Navbar() {
                   ) : null}
                 </div>
 
-                <span className="text-white/80">
-                  @{username ?? "player"}
-                </span>
+                <span className="text-white/80">@{username ?? "player"}</span>
 
                 <span className="text-white/50">▾</span>
               </button>
@@ -125,6 +123,15 @@ export default function Navbar() {
                   <div className="h-px bg-white/10" />
 
                   <div className="p-2">
+                    {/* ✅ NEW: Accès direct à la maison */}
+                    <Link
+                      href="/account/profil/home"
+                      onClick={() => setOpen(false)}
+                      className="block rounded-xl px-3 py-2 text-white/80 hover:bg-white/10"
+                    >
+                      🏠 Ma Maison
+                    </Link>
+
                     <Link
                       href={username ? `/u/${username}` : "/account/profil"}
                       onClick={() => setOpen(false)}
