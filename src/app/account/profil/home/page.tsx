@@ -9,7 +9,7 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth");
+  if (!user) redirect("/auth?mode=login&next=/account/profil/home");
 
   return <HomeEditor userId={user.id} />;
 }

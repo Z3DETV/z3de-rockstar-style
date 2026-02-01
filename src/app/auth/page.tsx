@@ -12,6 +12,14 @@ function isValidUsername(u: string) {
   return u.length >= 3 && u.length <= 20 && /^[A-Za-z0-9_]+$/.test(u);
 }
 
+function safeNext(raw: string | null) {
+  // Sécurité: on accepte seulement les chemins internes
+  if (!raw) return "/";
+  if (!raw.startsWith("/")) return "/";
+  if (raw.startsWith("//")) return "/";
+  return raw;
+}
+
 function AuthInner() {
   const searchParams = useSearchParams();
 
@@ -21,6 +29,9 @@ function AuthInner() {
   const [username, setUsername] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // ✅ Destination après login (ex: /account/profil/home)
+  const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
 
   // ✅ Ouvre automatiquement login/register selon l'URL : /auth?mode=login
   useEffect(() => {
@@ -64,9 +75,9 @@ function AuthInner() {
         email,
         password,
         options: {
+          // ✅ on conserve ton callback
           emailRedirectTo: `${origin}/auth/callback`,
           data: {
-            // ✅ le pseudo voyage avec la confirmation email
             pending_username: u,
           },
         },
@@ -75,7 +86,7 @@ function AuthInner() {
       if (error) throw error;
 
       setMsg(
-        "✅ Compte créé ! Va confirmer ton email. Après validation, tu seras renvoyé automatiquement sur le site."
+        `✅ Compte créé ! Va confirmer ton email. Après validation, tu seras renvoyé automatiquement sur le site.`
       );
       setMode("login");
     } catch (err: any) {
@@ -97,7 +108,8 @@ function AuthInner() {
       });
       if (error) throw error;
 
-      window.location.href = "/";
+      // ✅ REDIRECT vers next
+      window.location.href = nextPath;
     } catch (err: any) {
       setMsg(err?.message ?? "Erreur inconnue");
     } finally {
@@ -175,6 +187,14 @@ function AuthInner() {
             {busy ? "..." : mode === "register" ? "Créer" : "Connexion"}
           </button>
         </form>
+
+        {/* ✅ Petit rappel de destination */}
+        {mode === "login" && nextPath !== "/" && (
+          <p className="mt-3 text-xs text-white/60">
+            Après connexion, tu seras redirigé vers :{" "}
+            <span className="text-white/80">{nextPath}</span>
+          </p>
+        )}
 
         {msg && <p className="mt-4 text-sm text-white/80">{msg}</p>}
       </div>
