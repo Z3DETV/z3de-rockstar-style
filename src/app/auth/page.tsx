@@ -2,7 +2,8 @@
 
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@/lib/supabase/client";
+
 
 function normalizeUsername(input: string) {
   return input.trim();
@@ -22,6 +23,8 @@ function safeNext(raw: string | null) {
 
 function AuthInner() {
   const searchParams = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
+
 
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
