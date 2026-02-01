@@ -6,7 +6,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Profile = {
-  id?: string; // on l'utilise pour la maison (user_id)
   username: string;
   display_name: string | null;
   bio: string | null;
@@ -14,9 +13,22 @@ type Profile = {
   updated_at: string | null;
 };
 
-type Slot = "wall" | "floor" | "furniture_1" | "decor_1" | "decor_2" | "effect_1";
+type Slot =
+  | "wall"
+  | "floor"
+  | "furniture_1"
+  | "decor_1"
+  | "decor_2"
+  | "effect_1";
 
-const SLOTS: Slot[] = ["wall", "floor", "furniture_1", "decor_1", "decor_2", "effect_1"];
+const SLOTS: Slot[] = [
+  "wall",
+  "floor",
+  "furniture_1",
+  "decor_1",
+  "decor_2",
+  "effect_1",
+];
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
@@ -64,26 +76,18 @@ export default async function PublicProfilePage({
 
   const supabase = await createClient();
 
-  // 1) Profil
-  const { data: profile, error: profileError } = await supabase
+  /* =========================
+     1) Profil public
+  ========================== */
+  const { data: profile, error: publicError } = await supabase
     .from("profiles_public")
-    .select("id, username, display_name, bio, avatar_url, updated_at")
+    .select("username, display_name, bio, avatar_url, updated_at")
     .eq("username_lc", username.toLowerCase())
     .maybeSingle();
 
-  if (profileError) {
-    console.error("[public-profile] error:", profileError);
-    return (
-      <PageShell>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-          Une erreur est survenue.
-        </div>
-      </PageShell>
-    );
-  }
+  if (publicError || !profile) {
+    console.error("[public-profile]", publicError);
 
-  if (!profile) {
-    console.warn("[public-profile] NOT FOUND:", username);
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
@@ -93,8 +97,32 @@ export default async function PublicProfilePage({
     );
   }
 
-  // 2) Maison équipée (publique)
-  // home_equipped est lisible publiquement (RLS ok) mais on récupère via l'id du profil (UUID)
+  /* =========================
+     2) Récupérer ID depuis profiles
+  ========================== */
+  const { data: privateProfile, error: privateError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("username_lc", username.toLowerCase())
+    .maybeSingle();
+
+  if (privateError || !privateProfile) {
+    console.error("[private-profile]", privateError);
+
+    return (
+      <PageShell>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
+          Impossible de charger la maison.
+        </div>
+      </PageShell>
+    );
+  }
+
+  const userId = privateProfile.id;
+
+  /* =========================
+     3) Maison équipée
+  ========================== */
   const { data: equippedRows, error: homeError } = await supabase
     .from("home_equipped")
     .select(
@@ -107,18 +135,21 @@ export default async function PublicProfilePage({
       )
     `
     )
-    .eq("user_id", profile.id);
+    .eq("user_id", userId);
 
   if (homeError) {
-    console.error("[public-home] error:", homeError);
+    console.error("[public-home]", homeError);
   }
 
-  // Map slot -> item name
   const equippedMap = new Map<Slot, string>();
+
   for (const row of (equippedRows ?? []) as any[]) {
     const slot = row?.slot as Slot | undefined;
     const name = row?.user_items?.items?.name as string | undefined;
-    if (slot && SLOTS.includes(slot)) equippedMap.set(slot, name ?? "—");
+
+    if (slot && SLOTS.includes(slot)) {
+      equippedMap.set(slot, name ?? "—");
+    }
   }
 
   return (
@@ -148,7 +179,7 @@ export default async function PublicProfilePage({
 
           {!equippedRows?.length && (
             <div className="mt-4 text-sm text-white/60">
-              Aucune décoration équipée pour le moment.
+              Aucune décoration équipée.
             </div>
           )}
         </section>
