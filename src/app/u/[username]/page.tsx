@@ -23,16 +23,28 @@ function PageShell({ children }: { children: React.ReactNode }) {
           >
             ← Accueil
           </a>
+
           <span className="text-sm text-white/60">Profil public</span>
         </div>
+
         {children}
       </div>
     </main>
   );
 }
 
+/**
+ * Nettoyage MAXIMAL du username
+ */
 function normalizeUsername(raw: string) {
-  return decodeURIComponent(raw ?? "").trim().replaceAll("/", "");
+  if (!raw) return "";
+
+  return decodeURIComponent(raw)
+    .replace(/\?.*$/, "") // enlève tout après ?
+    .replace(/#.*/, "")   // enlève tout après #
+    .trim()
+    .replaceAll("/", "")
+    .toLowerCase();       // on force en lowercase
 }
 
 export default async function PublicProfilePage({
@@ -40,26 +52,33 @@ export default async function PublicProfilePage({
 }: {
   params: { username: string };
 }) {
-  const username = normalizeUsername(params.username);
+  const raw = params.username;
+  const username = normalizeUsername(raw);
+
+  console.log("[PROFILE] RAW =", raw);
+  console.log("[PROFILE] CLEAN =", username);
 
   const { data, error } = await publicSupabase
     .from("profiles_public")
     .select("username, display_name, bio, avatar_url, updated_at")
-    .eq("username_lc", username.toLowerCase())
+    .eq("username_lc", username)
     .maybeSingle();
 
   if (error) {
-    console.error("[public-profile] fetch error:", error);
+    console.error("[public-profile] error:", error);
+
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-          Une erreur est survenue lors du chargement du profil.
+          Une erreur est survenue.
         </div>
       </PageShell>
     );
   }
 
   if (!data) {
+    console.warn("[public-profile] NOT FOUND:", username);
+
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
