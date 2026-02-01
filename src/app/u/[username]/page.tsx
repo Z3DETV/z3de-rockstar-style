@@ -23,10 +23,8 @@ function PageShell({ children }: { children: React.ReactNode }) {
           >
             ← Accueil
           </a>
-
           <span className="text-sm text-white/60">Profil public</span>
         </div>
-
         {children}
       </div>
     </main>
@@ -34,10 +32,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
 }
 
 function normalizeUsername(raw: string) {
-  return decodeURIComponent(raw ?? "")
-    .trim()
-    .replaceAll("/", "")
-    .toLowerCase(); // 🔥 IMPORTANT
+  return decodeURIComponent(raw ?? "").trim().replaceAll("/", "");
 }
 
 export default async function PublicProfilePage({
@@ -45,28 +40,20 @@ export default async function PublicProfilePage({
 }: {
   params: { username: string };
 }) {
-  // ⚠️ Si publicSupabase est une fonction
-  const supabase = publicSupabase();
-
   const username = normalizeUsername(params.username);
 
-  console.log("[PUBLIC PROFILE] username =", username);
-
-  const { data, error } = await supabase
-    .from("profiles_public") // 👈 ta vue
+  const { data, error } = await publicSupabase
+    .from("profiles_public")
     .select("username, display_name, bio, avatar_url, updated_at")
-    .eq("username_lc", username)
+    .eq("username_lc", username.toLowerCase())
     .maybeSingle();
 
-  console.log("[PUBLIC PROFILE] result =", { data, error });
-
   if (error) {
-    console.error("[public-profile] error:", error);
-
+    console.error("[public-profile] fetch error:", error);
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-          Erreur lors du chargement du profil.
+          Une erreur est survenue lors du chargement du profil.
         </div>
       </PageShell>
     );
