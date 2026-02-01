@@ -37,7 +37,7 @@ function normalizeUsername(raw: string) {
   return decodeURIComponent(raw ?? "")
     .trim()
     .replaceAll("/", "")
-    .toLowerCase();
+    .toLowerCase(); // 🔥 IMPORTANT
 }
 
 export default async function PublicProfilePage({
@@ -45,18 +45,23 @@ export default async function PublicProfilePage({
 }: {
   params: { username: string };
 }) {
-  const supabase = publicSupabase;
+  // ⚠️ Si publicSupabase est une fonction
+  const supabase = publicSupabase();
 
   const username = normalizeUsername(params.username);
 
+  console.log("[PUBLIC PROFILE] username =", username);
+
   const { data, error } = await supabase
-    .from("profiles_public")
+    .from("profiles_public") // 👈 ta vue
     .select("username, display_name, bio, avatar_url, updated_at")
     .eq("username_lc", username)
     .maybeSingle();
 
+  console.log("[PUBLIC PROFILE] result =", { data, error });
+
   if (error) {
-    console.error("[public-profile]", error);
+    console.error("[public-profile] error:", error);
 
     return (
       <PageShell>
