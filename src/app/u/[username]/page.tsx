@@ -23,6 +23,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
           >
             ← Accueil
           </a>
+
           <span className="text-sm text-white/60">Profil public</span>
         </div>
 
@@ -33,8 +34,10 @@ function PageShell({ children }: { children: React.ReactNode }) {
 }
 
 function normalizeUsername(raw: string) {
-  const decoded = decodeURIComponent(raw ?? "");
-  return decoded.trim().replaceAll("/", "");
+  return decodeURIComponent(raw ?? "")
+    .trim()
+    .replaceAll("/", "")
+    .toLowerCase();
 }
 
 export default async function PublicProfilePage({
@@ -45,49 +48,20 @@ export default async function PublicProfilePage({
   const supabase = publicSupabase;
 
   const username = normalizeUsername(params.username);
-  const usernameLc = username.toLowerCase();
 
-  let data: Profile | null = null;
-  let error: any = null;
-
-  // 1) ✅ Requête principale via la vue (case-insensitive garanti)
-  {
-    const res = await supabase
-      .from("profiles_public")
-      .select("username, display_name, bio, avatar_url, updated_at")
-      .eq("username_lc", usernameLc)
-      .maybeSingle();
-
-    data = (res.data as Profile | null) ?? null;
-    error = res.error ?? null;
-  }
-
-  // 2) ✅ Fallback si la vue n'existe pas OU si ça ne remonte rien
-  if (!error && !data) {
-    const res = await supabase
-      .from("profiles")
-      .select("username, display_name, bio, avatar_url, updated_at")
-      .ilike("username", username)
-      .limit(1)
-      .maybeSingle();
-
-    data = (res.data as Profile | null) ?? null;
-    error = res.error ?? null;
-  }
+  const { data, error } = await supabase
+    .from("profiles_public")
+    .select("username, display_name, bio, avatar_url, updated_at")
+    .eq("username_lc", username)
+    .maybeSingle();
 
   if (error) {
-    console.error("[public-profile] fetch error:", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-      username,
-    });
+    console.error("[public-profile]", error);
 
     return (
       <PageShell>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-          Une erreur est survenue lors du chargement du profil.
+          Erreur lors du chargement du profil.
         </div>
       </PageShell>
     );
@@ -105,7 +79,7 @@ export default async function PublicProfilePage({
 
   return (
     <PageShell>
-      <ProfileCard profile={data} />
+      <ProfileCard profile={data as Profile} />
     </PageShell>
   );
 }
