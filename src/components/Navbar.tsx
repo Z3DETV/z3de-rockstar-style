@@ -1,13 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type Profile = {
   username: string | null;
@@ -15,6 +10,8 @@ type Profile = {
 };
 
 export default function Navbar() {
+  const supabase = useMemo(() => createClient(), []);
+
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -51,6 +48,7 @@ export default function Navbar() {
     });
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Close dropdown on outside click / ESC
@@ -107,7 +105,6 @@ export default function Navbar() {
                 </div>
 
                 <span className="text-white/80">@{username ?? "player"}</span>
-
                 <span className="text-white/50">▾</span>
               </button>
 
@@ -123,7 +120,7 @@ export default function Navbar() {
                   <div className="h-px bg-white/10" />
 
                   <div className="p-2">
-                    {/* ✅ NEW: Accès direct à la maison */}
+                    {/* Accès direct à la maison */}
                     <Link
                       href="/account/profil/home"
                       onClick={() => setOpen(false)}
