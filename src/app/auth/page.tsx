@@ -4,7 +4,6 @@ import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-
 function normalizeUsername(input: string) {
   return input.trim();
 }
@@ -25,7 +24,6 @@ function AuthInner() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
-
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,10 +31,10 @@ function AuthInner() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // ✅ Destination après login (ex: /account/profil/home)
+  // Destination après login (ex: /account/profil/home)
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
 
-  // ✅ Ouvre automatiquement login/register selon l'URL : /auth?mode=login
+  // Ouvre automatiquement login/register selon l'URL : /auth?mode=login
   useEffect(() => {
     const m = searchParams.get("mode");
     if (m === "login" || m === "register") setMode(m);
@@ -69,17 +67,18 @@ function AuthInner() {
     setBusy(true);
 
     try {
-      // Backup local (utile si jamais metadata ne passe pas dans un contexte bizarre)
+      // Backup local (utile si jamais metadata ne passe pas)
       localStorage.setItem("pending_username", u);
 
-      const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      // ✅ Toujours renvoyer vers le même domaine que celui utilisé
+      const origin = window.location.origin;
 
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // ✅ on conserve ton callback
-          emailRedirectTo: `${origin}/auth/callback`,
+          // ✅ Retour sur accueil connecté après validation
+          emailRedirectTo: `${origin}/auth/callback?next=/`,
           data: {
             pending_username: u,
           },
@@ -89,7 +88,7 @@ function AuthInner() {
       if (error) throw error;
 
       setMsg(
-        `✅ Compte créé ! Va confirmer ton email. Après validation, tu seras renvoyé automatiquement sur le site.`
+        "✅ Compte créé ! Va confirmer ton email. Après validation, tu seras connecté automatiquement."
       );
       setMode("login");
     } catch (err: any) {
@@ -111,8 +110,8 @@ function AuthInner() {
       });
       if (error) throw error;
 
-      // ✅ REDIRECT vers next
-      window.location.href = nextPath;
+      // ✅ Redirection vers next (ou / par défaut)
+      window.location.href = nextPath || "/";
     } catch (err: any) {
       setMsg(err?.message ?? "Erreur inconnue");
     } finally {
@@ -128,15 +127,13 @@ function AuthInner() {
             <h1 className="text-xl font-semibold">
               {mode === "register" ? "Créer un compte" : "Se connecter"}
             </h1>
-            <a
-              href="/"
-              className="mt-2 inline-block text-sm text-white/70 hover:text-white"
-            >
+            <a href="/" className="mt-2 inline-block text-sm text-white/70 hover:text-white">
               ← Retour à l’accueil
             </a>
           </div>
 
           <button
+            type="button"
             className="text-sm text-white/70 hover:text-white"
             onClick={() => {
               setMsg(null);
@@ -147,10 +144,7 @@ function AuthInner() {
           </button>
         </div>
 
-        <form
-          className="mt-6 space-y-3"
-          onSubmit={mode === "register" ? onRegister : onLogin}
-        >
+        <form className="mt-6 space-y-3" onSubmit={mode === "register" ? onRegister : onLogin}>
           <input
             className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 outline-none"
             placeholder="Email"
@@ -191,7 +185,6 @@ function AuthInner() {
           </button>
         </form>
 
-        {/* ✅ Petit rappel de destination */}
         {mode === "login" && nextPath !== "/" && (
           <p className="mt-3 text-xs text-white/60">
             Après connexion, tu seras redirigé vers :{" "}
